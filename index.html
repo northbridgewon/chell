@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>webShell</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- CodeMirror Assets -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/htmlmixed/htmlmixed.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closebrackets.min.js"></script>
+
+
+    <style>
+        :root {
+            /* Default Theme: tokyo-night */
+            --background: rgba(26, 27, 38, 0.75);
+            --foreground: #c0caf5;
+            --prompt: #7aa2f7;
+            --cursor: #7aa2f7;
+            --border: rgba(65, 72, 104, 0.5);
+            --shadow: rgba(0, 0, 0, 0.3);
+            --error: #f7768e;
+            --success: #9ece6a;
+            --info: #e0af68;
+            --file: #7dcfff;
+            --ascii: #bb9af7;
+        }
+
+        @keyframes gradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        body {
+            color: var(--foreground);
+            font-family: 'Fira Code', 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            
+            /* Refined, neutral animated background */
+            background: linear-gradient(-45deg, #111, #222, #111, #333);
+            background-size: 400% 400%;
+            animation: gradientAnimation 20s ease infinite;
+        }
+
+        @keyframes floatAnimation {
+            0% { transform: translateY(0px); box-shadow: 0 10px 30px var(--shadow); }
+            50% { transform: translateY(-15px); box-shadow: 0 25px 40px var(--shadow); }
+            100% { transform: translateY(0px); box-shadow: 0 10px 30px var(--shadow); }
+        }
+
+        #terminal {
+            width: 90%;
+            max-width: 900px;
+            height: 80vh;
+            
+            /* Glassmorphism Effect */
+            background-color: var(--background);
+            backdrop-filter: blur(12px) saturate(150%);
+            -webkit-backdrop-filter: blur(12px) saturate(150%);
+            
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            animation: floatAnimation 8s ease-in-out infinite;
+            scroll-behavior: smooth;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+
+        #terminal::-webkit-scrollbar { width: 8px; }
+        #terminal::-webkit-scrollbar-track { background: transparent; }
+        #terminal::-webkit-scrollbar-thumb { background-color: var(--border); border-radius: 4px; }
+
+        #output {
+            flex-grow: 1;
+            white-space: pre-wrap;
+            word-break: break-all;
+            user-select: text;
+        }
+
+        .output-line { margin-bottom: 2px; line-height: 1.5; color: var(--foreground); }
+        .ascii-art { color: var(--ascii); font-weight: bold; white-space: pre; }
+        .prompt-line { color: var(--prompt); }
+        .error-line { color: var(--error); }
+        .info-line { color: var(--info); }
+        .success-line { color: var(--success); }
+        .file-line { color: var(--file); }
+
+        #input-container { display: flex; align-items: center; margin-top: 10px; }
+        #prompt { margin-right: 8px; color: var(--prompt); font-weight: bold; }
+
+        #command-input {
+            flex-grow: 1;
+            background-color: transparent;
+            border: none;
+            color: var(--foreground);
+            font-family: 'Fira Code', 'Courier New', Courier, monospace;
+            font-size: 1em;
+            outline: none;
+            caret-color: var(--cursor);
+        }
+        
+        #editor-container {
+            display: none;
+            flex-direction: column;
+            flex-grow: 1;
+            height: 100%;
+            margin-bottom: 10px;
+        }
+        
+        #editor-info {
+            font-size: 0.9em;
+            color: var(--info);
+            padding: 5px 0;
+            text-align: center;
+        }
+
+        /* CodeMirror Styling */
+        .CodeMirror {
+            flex-grow: 1;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            height: auto;
+            font-size: 0.9em;
+            background-color: transparent !important; /* Ensure CM background is transparent */
+        }
+        .CodeMirror-gutters {
+             background-color: transparent !important;
+        }
+        .cm-s-dracula { 
+            background-color: transparent !important; /* Override theme background */
+        }
+
+    </style>
+</head>
+
+<body>
+    <div id="terminal">
+        <div id="output"></div>
+        <div id="editor-container">
+            <textarea id="editor"></textarea>
+            <div id="editor-info">Ctrl+S to save and exit | Ctrl+Q to exit without saving.</div>
+        </div>
+        <div id="input-container">
+            <span id="prompt">root@webshell:~$</span>
+            <input type="text" id="command-input" autofocus>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const outputDiv = document.getElementById('output');
+            const commandInput = document.getElementById('command-input');
+            const terminalDiv = document.getElementById('terminal');
+            const promptSpan = document.getElementById('prompt');
+            const inputContainer = document.getElementById('input-container');
+            const editorContainer = document.getElementById('editor-container');
+            const editorTextArea = document.getElementById('editor');
+            
+            const storagePrefix = 'gemini_terminal_file_';
+            let isEditing = false;
+            let currentFile = '';
+            let commandHistory = [];
+            let historyIndex = -1;
+            let codeMirrorInstance = null;
+
+            // --- THEME ENGINE ---
+            const themes = {
+                'tokyo-night': {
+                    '--background': 'rgba(26, 27, 38, 0.7)', '--foreground': '#c0caf5', '--prompt': '#7aa2f7',
+                    '--cursor': '#7aa2f7', '--border': 'rgba(65, 72, 104, 0.5)', '--shadow': 'rgba(0, 0, 0, 0.3)',
+                    '--error': '#f7768e', '--success': '#9ece6a', '--info': '#e0af68',
+                    '--file': '#7dcfff', '--ascii': '#bb9af7'
+                },
+                'matrix': {
+                    '--background': 'rgba(0, 20, 0, 0.75)', '--foreground': '#00ff41', '--prompt': '#00ff41',
+                    '--cursor': '#00ff41', '--border': 'rgba(0, 255, 65, 0.4)', '--shadow': 'rgba(0, 255, 65, 0.5)',
+                    '--error': '#ff0000', '--success': '#00ff41', '--info': '#00ff41',
+                    '--file': '#00ff41', '--ascii': '#00ff41'
+                },
+                'dracula': {
+                    '--background': 'rgba(40, 42, 54, 0.75)', '--foreground': '#f8f8f2', '--prompt': '#bd93f9',
+                    '--cursor': '#f8f8f2', '--border': 'rgba(68, 71, 90, 0.6)', '--shadow': 'rgba(0, 0, 0, 0.4)',
+                    '--error': '#ff5555', '--success': '#50fa7b', '--info': '#f1fa8c',
+                    '--file': '#8be9fd', '--ascii': '#ff79c6'
+                },
+                 'solarized-light': {
+                    '--background': 'rgba(253, 246, 227, 0.7)', '--foreground': '#657b83', '--prompt': '#268bd2',
+                    '--cursor': '#657b83', '--border': 'rgba(238, 232, 213, 0.5)', '--shadow': 'rgba(0,0,0,0.1)',
+                    '--error': '#dc322f', '--success': '#859900', '--info': '#b58900',
+                    '--file': '#2aa198', '--ascii': '#6c71c4'
+                },
+                'gruvbox': {
+                    '--background': 'rgba(40, 40, 40, 0.8)', '--foreground': '#ebdbb2', '--prompt': '#fabd2f',
+                    '--cursor': '#ebdbb2', '--border': 'rgba(80, 73, 69, 0.6)', '--shadow': 'rgba(0,0,0,0.3)',
+                    '--error': '#fb4934', '--success': '#b8bb26', '--info': '#fe8019',
+                    '--file': '#83a598', '--ascii': '#d3869b'
+                },
+                'nord': {
+                    '--background': 'rgba(46, 52, 64, 0.8)', '--foreground': '#D8DEE9', '--prompt': '#88C0D0',
+                    '--cursor': '#D8DEE9', '--border': 'rgba(59, 66, 82, 0.6)', '--shadow': 'rgba(0,0,0,0.2)',
+                    '--error': '#BF616A', '--success': '#A3BE8C', '--info': '#EBCB8B',
+                    '--file': '#81A1C1', '--ascii': '#B48EAD'
+                },
+                'cyberpunk': {
+                    '--background': 'rgba(13, 2, 33, 0.7)', '--foreground': '#f0f0f0', '--prompt': '#ff00f1',
+                    '--cursor': '#00f0ff', '--border': 'rgba(36, 0, 70, 0.5)', '--shadow': 'rgba(255,0,241,0.3)',
+                    '--error': '#ff3333', '--success': '#00ff9f', '--info': '#fcee09',
+                    '--file': '#00f0ff', '--ascii': '#711c91'
+                },
+                'paper': {
+                    '--background': 'rgba(245, 245, 245, 0.75)', '--foreground': '#212121', '--prompt': '#005faf',
+                    '--cursor': '#212121', '--border': 'rgba(224, 224, 224, 0.5)', '--shadow': 'rgba(0,0,0,0.15)',
+                    '--error': '#d70000', '--success': '#008700', '--info': '#f57f17',
+                    '--file': '#005faf', '--ascii': '#5f00d7'
+                }
+            };
+
+            const applyTheme = (themeName) => {
+                const theme = themes[themeName];
+                if (!theme) return false;
+                for (const [key, value] of Object.entries(theme)) {
+                    document.documentElement.style.setProperty(key, value);
+                }
+                localStorage.setItem('webShellTheme', themeName);
+                return true;
+            };
+
+            // --- Utility, Editor, Command, Core Logic, and Event Listener functions remain the same ---
+            // ... (All previous JS logic from line 220 onwards is unchanged) ...
+
+            // --- Utility Functions ---
+            const scrollToBottom = () => terminalDiv.scrollTop = terminalDiv.scrollHeight;
+
+            const renderLine = (htmlContent, className = 'output-line') => {
+                 const lineElement = document.createElement('div');
+                 lineElement.className = className;
+                 lineElement.innerHTML = htmlContent;
+                 outputDiv.appendChild(lineElement);
+                 scrollToBottom();
+            };
+
+            const typeLine = (line, speed = 15, className = 'output-line') => {
+                return new Promise(resolve => {
+                    const lineElement = document.createElement('div');
+                    lineElement.className = className;
+                    outputDiv.appendChild(lineElement);
+                    if (line === "") { scrollToBottom(); resolve(); return; }
+                    let i = 0;
+                    const type = () => {
+                        if (i < line.length) {
+                            lineElement.textContent += line.charAt(i);
+                            scrollToBottom();
+                            i++;
+                            setTimeout(type, speed);
+                        } else { resolve(); }
+                    };
+                    type();
+                });
+            };
+
+            // --- Editor Mode ---
+            const enterEditor = (filename) => {
+                isEditing = true;
+                currentFile = filename;
+                
+                inputContainer.style.display = 'none';
+                outputDiv.style.display = 'none';
+                editorContainer.style.display = 'flex';
+                
+                let mode = 'text/plain';
+                if (filename.endsWith('.js')) mode = 'javascript';
+                else if (filename.endsWith('.html')) mode = 'htmlmixed';
+                else if (filename.endsWith('.css')) mode = 'css';
+
+                editorTextArea.value = localStorage.getItem(storagePrefix + filename) || '';
+                codeMirrorInstance = CodeMirror.fromTextArea(editorTextArea, {
+                    mode: mode,
+                    theme: 'dracula', // Editor theme is fixed to Dracula for now
+                    lineNumbers: true,
+                    autofocus: true,
+                    autoCloseBrackets: true,
+                    extraKeys: {
+                        "Ctrl-S": () => exitEditor(true),
+                        "Ctrl-Q": () => exitEditor(false),
+                    }
+                });
+                
+                codeMirrorInstance.setSize("100%", "100%");
+                setTimeout(() => codeMirrorInstance.refresh(), 1);
+            };
+
+            const exitEditor = (save = false) => {
+                if (save) {
+                    const content = codeMirrorInstance.getValue();
+                    localStorage.setItem(storagePrefix + currentFile, content);
+                    renderLine(`File saved: <span class="file-line">${currentFile}</span>`, 'success-line');
+                }
+
+                codeMirrorInstance.toTextArea();
+                codeMirrorInstance = null;
+                isEditing = false;
+                currentFile = '';
+
+                editorContainer.style.display = 'none';
+                outputDiv.style.display = 'block';
+                inputContainer.style.display = 'flex';
+                
+                if(!save) renderLine("Edit cancelled.", 'info-line');
+                
+                renderLine('');
+                commandInput.disabled = false;
+                setTimeout(() => commandInput.focus(), 0);
+            };
+
+            // --- Command Definitions ---
+            const commands = {
+                help: async () => {
+                    await typeLine("Web Shell v4.1 (Glass UI Refined)", 15, 'info-line');
+                    const helpText = [
+                        "  --- System ---",
+                        "  help                   - Display this help message.",
+                        "  clear                  - Clear the terminal screen.",
+                        "  motd                   - Display the message of the day.",
+                        "  theme [name]           - List or set the color theme.",
+                        "  --- Filesystem & Execution ---",
+                        "  ls                     - List all saved files.",
+                        "  edit [filename]        - Create or edit a file.",
+                        "  cat [filename]         - Display the content of a file.",
+                        "  rm [filename]          - Delete a file.",
+                        "  js [code|filename]     - Execute a JS file or evaluate code.",
+                    ];
+                    for (const line of helpText) { await typeLine(line, 5); }
+                },
+                theme: async (args) => {
+                    const themeName = args[0];
+                    if (!themeName) {
+                        await typeLine("Available themes:", 15, 'info-line');
+                        const themeList = Object.keys(themes).map(t => `  - ${t}`).join('\n');
+                        renderLine(themeList, 'output-line');
+                        return;
+                    }
+                    if (applyTheme(themeName)) {
+                        await typeLine(`Theme set to '${themeName}'.`, 15, 'success-line');
+                    } else {
+                        await typeLine(`Error: Theme '${themeName}' not found.`, 15, 'error-line');
+                    }
+                },
+                js: async (args) => {
+                    const input = args.join(' ');
+                    if (!input) { await typeLine("Usage: js <javascript-code | filename>", 15, 'error-line'); return; }
+                    const fileContent = localStorage.getItem(storagePrefix + input);
+                    const codeToRun = fileContent !== null ? fileContent : input;
+                    if (fileContent !== null) { await typeLine(`Executing script: <span class="file-line">${input}</span>`, 15, 'info-line'); }
+                    const terminalConsole = {
+                         log: (...args) => {
+                            const output = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)).join(' ');
+                            const pre = document.createElement('pre');
+                            pre.textContent = output;
+                            pre.style.fontFamily = "'Fira Code', monospace";
+                            pre.style.margin = "0";
+                            outputDiv.appendChild(pre);
+                            scrollToBottom();
+                        },
+                        error: (...args) => renderLine(args.join(' '), 'error-line'),
+                    };
+                    const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+                    try {
+                        await (new AsyncFunction('console', codeToRun))(terminalConsole);
+                    } catch (e) { terminalConsole.error(`${e.name}: ${e.message}`); }
+                },
+                edit: async (args) => {
+                    const filename = args[0];
+                    if (!filename) { await typeLine("Usage: edit <filename>.", 15, 'error-line'); return; }
+                    enterEditor(filename);
+                },
+                ls: async () => {
+                    let filesFound = false;
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key.startsWith(storagePrefix)) {
+                            await typeLine(key.replace(storagePrefix, ''), 10, 'file-line');
+                            filesFound = true;
+                        }
+                    }
+                    if (!filesFound) { await typeLine("No files found.", 15, 'info-line'); }
+                },
+                cat: async (args) => {
+                    const filename = args[0];
+                    if (!filename) { await typeLine("Usage: cat <filename>", 15, 'error-line'); return; }
+                    const content = localStorage.getItem(storagePrefix + filename);
+                    if (content !== null) {
+                        const pre = document.createElement('pre');
+                        pre.textContent = content;
+                        pre.style.fontFamily = "'Fira Code', monospace";
+                        pre.style.margin = "0";
+                        outputDiv.appendChild(pre);
+                        scrollToBottom();
+                    } else { await typeLine(`File not found: ${filename}`, 15, 'error-line'); }
+                },
+                rm: async (args) => {
+                    const filename = args[0];
+                    if (!filename) { await typeLine("Usage: rm <filename>", 15, 'error-line'); return; }
+                    if (localStorage.getItem(storagePrefix + filename) !== null) {
+                        localStorage.removeItem(storagePrefix + filename);
+                        await typeLine(`File deleted: ${filename}`, 15, 'success-line');
+                    } else { await typeLine(`File not found: ${filename}`, 15, 'error-line'); }
+                },
+                motd: async () => {
+                    const art = [
+                        '       .__           .__  .__   ',
+                        '  ____ |  |__   ____ |  | |  |  ',
+                        '_/ ___\\|  |  \\_/ __ \\|  | |  |  ',
+                        '\\  \\___|   Y  \\  ___/|  |_|  |__',
+                        ' \\___  >___|  /\\___  >____/____/',
+                        '     \\/     \\/     \\/           '
+                    ];
+                    for (const line of art) { await typeLine(line, 10, 'ascii-art'); }
+                    await typeLine("\nWelcome to \"chell\", the themable web IDE.", 15, 'info-line');
+                },
+                clear: () => { outputDiv.innerHTML = ''; return Promise.resolve(); },
+                whoami: async () => await typeLine("root"),
+                date: async () => await typeLine(new Date().toLocaleString()),
+            };
+            
+            // --- Core Logic ---
+            const processCommand = async (commandStr) => {
+                commandInput.disabled = true;
+                renderLine(`<span class="prompt-line">${promptSpan.textContent}</span> ${commandStr.replace(/</g, "&lt;").replace(/>/g, "&gt;")}`);
+
+                if (commandStr.trim() !== "") {
+                    commandHistory.unshift(commandStr);
+                    if (commandHistory.length > 50) commandHistory.pop();
+                }
+                historyIndex = -1;
+
+                const parts = commandStr.trim().split(/\s+/);
+                const baseCommand = parts[0].toLowerCase();
+                const args = parts.slice(1);
+
+                if (baseCommand in commands) {
+                    await commands[baseCommand](args);
+                } else if (baseCommand !== "") {
+                    await typeLine(`Command not found: ${baseCommand}`, 15, 'error-line');
+                }
+                
+                if (!isEditing) {
+                    await typeLine("");
+                    commandInput.disabled = false;
+                    commandInput.focus();
+                }
+            };
+
+            // --- Event Listeners ---
+            commandInput.addEventListener('keydown', async (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const command = commandInput.value;
+                    commandInput.value = '';
+                    await processCommand(command);
+                } else if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    if (historyIndex < commandHistory.length - 1) {
+                        historyIndex++;
+                        commandInput.value = commandHistory[historyIndex];
+                    }
+                } else if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    if (historyIndex > 0) {
+                        historyIndex--;
+                        commandInput.value = commandHistory[historyIndex];
+                    } else {
+                        historyIndex = -1;
+                        commandInput.value = '';
+                    }
+                }
+            });
+
+            terminalDiv.addEventListener('click', () => { if (!isEditing) commandInput.focus(); });
+
+            // --- Initial Load ---
+            const startTerminal = async () => {
+                const savedTheme = localStorage.getItem('webShellTheme');
+                applyTheme(savedTheme || 'tokyo-night');
+
+                await commands.motd();
+                await typeLine("Type 'help' for a list of available commands.", 15);
+                await typeLine("Type 'theme' to see all available themes.", 15, 'info-line');
+                await typeLine("");
+                commandInput.focus();
+            };
+
+            startTerminal();
+        });
+    </script>
+</body>
+</html>
